@@ -1,0 +1,9 @@
+[package]
+name = "coconut"
+version = "0.1.0"
+authors = ["Carl Malmz <callem217@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+futures-preview = "0.3.0-alpha.14"
+bytes = "0.4.12"
