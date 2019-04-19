@@ -4,6 +4,16 @@ version = "0.1.0"
 authors = ["Carl Malmz <callem217@gmail.com>"]
 edition = "2018"
 
+description = "codecs for futures 0.3"
+repository = "https://github.com/Malmz/coconut"
+readme = "README.md"
+keywords = ["async", "futures", "future", "codec"]
+categories = ["asynchronous"]
+license = "MIT"
+
+[badges]
+maintenance = { status = "experimental" }
+
 [dependencies]
 futures-preview = "0.3.0-alpha.14"
 bytes = "0.4.12"
