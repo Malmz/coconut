@@ -1,9 +1,15 @@
 #![feature(futures_api)]
 
+mod error;
+pub mod codec;
+
+use error::FramesError;
+
 use std::task::{ Context, Poll };
 use std::pin::Pin;
 
 use bytes::BytesMut;
+use bytes::BufMut;
 
 use futures::ready;
 
@@ -44,7 +50,7 @@ impl<C> FramesInner<C> {
             eof: false,
             is_readable: false,
             codec,
-            rb: BytesMut::new(),
+            rb: BytesMut::with_capacity(8 * 1024),
             wb: BytesMut::new(),
         }
     }
@@ -67,8 +73,6 @@ impl<C> FramesInner<C> where C: Decoder {
         self.codec.decode_eof(&mut self.rb)
     }
 }
-
-
 
 pub struct Frames<S, C> {
     source: S,
@@ -93,8 +97,6 @@ impl<S, C> Frames<S, C> {
         }
     }
 }
-
-// impl<S, C> Unpin for Frames<S, C> {}
 
 impl<S, C> Stream for Frames<S, C> 
     where
@@ -123,7 +125,13 @@ impl<S, C> Stream for Frames<S, C>
             assert!(!i.eof);
 
             i.rb.reserve(1);
-            if 0 == ready!(s.poll_read(cx, &mut i.rb))? {
+            let n = unsafe {
+                s.initializer().initialize(i.rb.bytes_mut());
+                let n = ready!(s.poll_read(cx, i.rb.bytes_mut()))?;
+                i.rb.advance_mut(n);
+                n
+            };
+            if 0 == n {
                 i.eof = true;
             }
             i.is_readable = true;
@@ -131,21 +139,13 @@ impl<S, C> Stream for Frames<S, C>
     }
 }
 
-pub enum FramesError<E> {
-    Io(futures::io::Error),
-    Encode(E)
-}
 
-impl<E> From<futures::io::Error> for FramesError<E> {
-    fn from(val: futures::io::Error) -> Self {
-        FramesError::Io(val)
-    }
-}
 
-impl<S, C, T> Sink<T> for Frames<S, C> 
+impl<S, C, T, E> Sink<T> for Frames<S, C> 
     where
         S: AsyncWrite,
-        C: Encoder<Item=T>,
+        C: Encoder<Item=T, Error=E>,
+        E: std::error::Error
 {
     type SinkError = FramesError<C::Error>;
 
@@ -180,13 +180,5 @@ impl<S, C, T> Sink<T> for Frames<S, C>
         unsafe {
             self.map_unchecked_mut(|x| &mut x.source).poll_close(cx).map_err(FramesError::Io)
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
     }
 }
